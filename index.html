@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MA Activity: Hangman Tic-Tac-Toe</title>
+<style>
+  body { 
+    font-family: Arial, sans-serif; 
+    text-align: center; 
+    background: #f4f4f9; 
+    margin: 20px; 
+  }
+  h1 { color: #333; margin-bottom: 10px; }
+  #turn { 
+    font-size: 2em; 
+    font-weight: bold; 
+    margin: 20px; 
+    padding: 15px;
+    border-radius: 12px;
+  }
+  .girls { color: deeppink; background: #ffeef8; }
+  .boys { color: royalblue; background: #e8f0fe; }
+
+  #tictactoe {
+    display: grid;
+    grid-template-columns: repeat(3, 180px);
+    grid-gap: 15px;
+    margin: 40px auto;
+    width: fit-content;
+  }
+  .cell {
+    width: 180px; height: 180px;
+    background: white;
+    border: 4px solid #333;
+    border-radius: 12px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    box-sizing: border-box;
+    line-height: 1.4;
+    text-align: center;
+    word-wrap: break-word;
+    transition: all 0.3s;
+  }
+  .cell.X { color: deeppink; background: #ffebee; font-size: 100px; }
+  .cell.O { color: royalblue; background: #e3f2fd; font-size: 100px; }
+  .cell.blocked { background: #ffcdd2; color: red; font-size: 70px; cursor: not-allowed; }
+
+  /* ========== HANGMAN OVERLAY ========== */
+  #hangman-area {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.94);
+    color: white;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 5px;
+    box-sizing: border-box;
+  }
+  #hangman-area.show { display: flex; }
+
+  /* Default (no-image) layout – original centered style */
+  #hangman-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  /* When an image is present → side-by-side layout */
+  #hangman-area.has-image #hangman-content {
+    flex-direction: row;
+    align-items: center;
+    gap: 50px;
+    max-width: 1100px;
+  }
+
+  #hangman-image-wrap {
+    display: none;                 /* hidden by default */
+    flex-shrink: 0;
+    width: 340px;
+    height: 340px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 4px solid gold;
+    background: #222;
+    box-shadow: 0 0 30px rgba(255,215,0,0.25);
+  }
+  #hangman-area.has-image #hangman-image-wrap {
+    display: block;
+  }
+  #hangman-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  #hangman-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+
+  #category-title { 
+    font-size: 3.2em; 
+    margin: 10px 0 8px; 
+    color: gold; 
+  }
+  #subcategory-hint { 
+    font-size: 1.7em; 
+    margin: 0 0 25px; 
+    color: #ffff99; 
+    font-style: italic;
+    max-width: 520px;
+    line-height: 1.35;
+  }
+  #word-display { 
+    font-size: 2.8em; 
+    letter-spacing: 0.15em; 
+    margin: 20px 0; 
+    font-weight: bold;
+    min-height: 1.2em;
+    white-space: pre-wrap;   /* keep spaces + allow wrap only at real word spaces */
+    max-width: 90vw;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+  #wrong-letters { 
+    font-size: 2em; 
+    margin: 12px 0; 
+    color: #ff7777; 
+    min-height: 40px; 
+  }
+  #wrong-count { 
+    font-size: 1.6em; 
+    color: #ffaaaa; 
+  }
+  #guess-input { 
+    font-size: 2.8em; 
+    width: 80px; 
+    text-align: center; 
+    padding: 8px;
+    margin: 18px 0 10px; 
+    text-transform: uppercase; 
+    border-radius: 10px; 
+    border: none;
+  }
+  #hangman-close { 
+    margin-top: 30px; 
+    padding: 14px 32px; 
+    font-size: 1.5em;
+    background: #444; 
+    color: white; 
+    border: none; 
+    border-radius: 12px; 
+    cursor: pointer;
+  }
+  #hangman-close:hover { background: #666; }
+
+  /* Slightly smaller fonts when image is present so everything fits */
+  #hangman-area.has-image #category-title { font-size: 2.6em; }
+  #hangman-area.has-image #subcategory-hint { font-size: 1.4em; }
+  #hangman-area.has-image #word-display { font-size: 2em; }
+
+  /* ========== WINNER SCREEN ========== */
+  #winner-screen {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.97);
+    color: gold; font-size: 5em; font-weight: bold;
+    display: none; align-items: center; justify-content: center; flex-direction: column;
+    text-shadow: 5px 5px 15px black; z-index: 200;
+  }
+  #winner-screen button {
+    margin-top: 50px; padding: 20px 50px; font-size: 1.8em;
+    background: gold; color: black; border: none; border-radius: 20px; cursor: pointer;
+  }
+
+  /* Responsive: stack vertically on smaller screens even with image */
+  @media (max-width: 900px) {
+    #hangman-area.has-image #hangman-content {
+      flex-direction: column;
+      gap: 25px;
+    }
+    #hangman-image-wrap {
+      width: 260px;
+      height: 260px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>MA Activity: Hangman Tic-Tac-Toe</h1>
+<div id="turn" class="girls">Girls (Pink X) turn!</div>
+
+<div id="tictactoe"></div>
+
+<div id="hangman-area">
+  <div id="hangman-content">
+    <!-- Image placeholder – only visible when a word has an image -->
+    <div id="hangman-image-wrap">
+      <img id="hangman-image" src="" alt="Guess from the picture">
+    </div>
+
+    <div id="hangman-text">
+      <h2 id="category-title"></h2>
+      <div id="subcategory-hint"></div>
+      <div id="word-display">_ _ _</div>
+      <div id="wrong-letters"></div>
+      <div>Wrong guesses: <span id="wrong-count">0 / 3</span></div>
+      <input id="guess-input" maxlength="1" autocomplete="off" autofocus placeholder="?">
+      <button id="hangman-close">Back to Board</button>
+    </div>
+  </div>
+</div>
+
+<div id="winner-screen">
+  <div id="winner-text"></div>
+  <button onclick="location.reload()">Play Again</button>
+</div>
+
+<script>
+const categories = ["Historic Events","Traditional Performance Art","Indonesian Food","Traditional Sports","National Heroes","Traditional Instruments","Independence Day Games","Traditional Weapons","Indonesian Island"];
+
+const wordBank = {
+  "Historic Events": [
+    {word: "SUMPAH PEMUDA", hint: "Celebrated every October 28, this event marked the declaration of Indonesian youth unity and nationalism."},
+    {word: "PROKLAMASI", hint: "The declaration of Indonesia's independence on August 17, 1945"}
+  ],
+  "Traditional Performance Art": [
+    {word: "ONDEL ONDEL", hint: "A traditional Indonesian dance form commonly found in Betawi culture, featuring large puppet-like figures"},
+    {word: "REOG", hint: "A traditional Indonesian dance form from East Java, known for its elaborate headpiece and dramatic movements", image: "reog.png"}
+  ],
+  "Indonesian Food": [
+    {word: "RENDANG", hint: "A traditional Indonesian dish made with meat slow-cooked in coconut milk and spices"},
+    {word: "GUDEG", hint: "A traditional Indonesian dish made with young jackfruit, often served with rice and sambal"}
+  ],
+  "Traditional Sports": [
+    {word: "KARAPAN SAPI", hint: "High speed buffalo racing, a traditional sport from Madura Island",image:"karapan_sapi.png"},
+    {word: "PACU JALUR", hint: "A traditional boat race held in West Sumatra, Indonesia, where teams row long wooden boats",image:"pacu_jalur.png"}
+  ],
+  "Traditional Instruments": [
+    {word: "SASANDO", hint: "A traditional stringed musical instrument from Rote Island, East Nusa Tenggara, Indonesia", image: "sasando.png"},
+    {word: "GAMELAN", hint: "A traditional ensemble of musical instruments from Java and Bali, Indonesia", image: "gamelan.png"}
+  ],
+  "National Heroes": [
+    {
+      word: "SOEDIRMAN",
+      hint: "Led guerilla war against the Dutch during the War of Independence",
+      image: "soedirman.png"
+      // no image → uses original centered layout
+    },
+    {
+      word: "MOHAMMAD HATTA",
+      hint: "Born in Bukittinggi, West Sumatra",
+      image: "hatta.png"
+    }
+  ],
+  "Independence Day Games": [
+    {word: "PANJAT PINANG", hint: "A traditional Indonesian game where participants climb a greased pole to reach prizes at the top, often played during Independence Day celebrations.", image: "panjat_pinang.png"},
+    {word: "BALAP KARUNG", hint: "A traditional Indonesian game where participants race in a sack, often played during Independence Day celebrations.", image: "balap_karung.png"}
+  ],
+  "Traditional Weapon": [
+    {word: "KERIS", hint: "A traditional Indonesian weapon with a distinctive wavy blade"},
+    {word: "MANDAU", hint: "A traditional Indonesian weapon from Borneo, often used by the Dayak people, known for its unique design and cultural significance", image: "mandau.png"}
+  ],
+  "Indonesian Island": [
+    {word: "MALUKU", hint: "Group of islands in the eastern part of the country, known for its rich history as the original Spice Islands"},
+    {word: "BALI", hint: "An island in Indonesia known for its forested volcanic mountains, iconic rice paddies, beaches and coral reefs"}
+  ]
+};
+
+/* ============================================================
+   HOW TO ADD A PICTURE ENTRY
+   Simply add an "image" property (URL or relative path) to any
+   word object. When present, the hangman screen switches to a
+   side-by-side layout with the picture. When absent, the
+   original centered layout is used.
+
+   Example:
+     {word: "SOEKARNO", hint: "...", image: "https://...jpg"}
+
+   You can also create a whole new category:
+     categories.push("National Heroes");
+     wordBank["National Heroes"] = [
+       {word: "HATTA", hint: "...", image: "url-or-path"},
+       {word: "...", hint: "..."}   // no image = original layout
+     ];
+   ============================================================ */
+
+let currentPlayer = "X";
+let board = Array(9).fill(null);
+let attempts = Array(9).fill(0);
+let currentCell = null;
+let currentWord = "";
+let currentHint = "";
+let currentImage = null;          // new: holds image URL or null
+let displayedWord = [];
+let wrongGuesses = 0;
+let guessedLetters = new Set();
+let gameActive = true;
+
+// Build board
+const tictactoe = document.getElementById("tictactoe");
+categories.forEach((cat, i) => {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  cell.innerHTML = cat.replace(" ", "<br>");
+  cell.dataset.index = i;
+  cell.onclick = () => startHangman(i);
+  tictactoe.appendChild(cell);
+});
+
+function updateTurnDisplay() {
+  const el = document.getElementById("turn");
+  if (!gameActive) return;
+  if (currentPlayer === "X") {
+    el.innerHTML = "Girls' turn → <span style='color:deeppink;font-size:1.3em'>X</span>";
+    el.className = "girls";
+  } else {
+    el.innerHTML = "Boys' turn → <span style='color:royalblue;font-size:1.3em'>O</span>";
+    el.className = "boys";
+  }
+}
+
+function startHangman(index) {
+  if (!gameActive || board[index] || attempts[index] >= 2) return;
+
+  currentCell = index;
+  const entry = wordBank[categories[index]][attempts[index]];
+  currentWord = entry.word;
+  currentHint = entry.hint;
+  currentImage = entry.image || null;   // optional image
+  // Pre-fill spaces so they never need to be guessed.
+  // A real space character is kept; renderWord turns it into a clear visual gap.
+  displayedWord = currentWord.split('').map(ch => ch === ' ' ? ' ' : '_');
+  wrongGuesses = 0;
+  guessedLetters.clear();
+
+  // Reset word-display color in case previous round failed
+  document.getElementById("word-display").style.color = "";
+
+  // Title & hint
+  document.getElementById("category-title").textContent = categories[index];
+  document.getElementById("subcategory-hint").textContent = currentHint;
+
+  // Image handling
+  const hangmanArea = document.getElementById("hangman-area");
+  const imgEl = document.getElementById("hangman-image");
+  if (currentImage) {
+    imgEl.src = currentImage;
+    hangmanArea.classList.add("has-image");
+  } else {
+    imgEl.src = "";
+    hangmanArea.classList.remove("has-image");
+  }
+
+  renderWord();
+  renderWrongLetters();
+  document.getElementById("wrong-count").textContent = "0 / 3";
+  document.getElementById("guess-input").value = "";
+  document.getElementById("guess-input").disabled = false;
+  hangmanArea.classList.add("show");
+  document.getElementById("guess-input").focus();
+}
+
+function renderWord() {
+  // Each letter (or _) is separated by one space.
+  // A real space from the answer becomes an extra gap → clear word separation.
+  // white-space: pre-wrap on the element keeps those spaces visible.
+  document.getElementById("word-display").textContent = displayedWord.join(" ");
+}
+
+function renderWrongLetters() {
+  const wrong = [...guessedLetters].filter(l => !currentWord.includes(l));
+  document.getElementById("wrong-letters").textContent = 
+    wrong.length ? "Wrong: " + wrong.join("  ") : "";
+}
+
+document.getElementById("guess-input").addEventListener("input", function(e) {
+  if (wrongGuesses >= 3) return;
+
+  let letter = e.target.value.toUpperCase();
+  if (!/[A-Z]/.test(letter)) { e.target.value = ""; return; }
+
+  if (guessedLetters.has(letter)) {
+    e.target.value = "";
+    return;
+  }
+
+  guessedLetters.add(letter);
+  e.target.value = "";
+
+  if (currentWord.includes(letter)) {
+    for (let i = 0; i < currentWord.length; i++) {
+      if (currentWord[i] === letter) displayedWord[i] = letter;
+    }
+    renderWord();
+    if (!displayedWord.includes("_")) {
+      setTimeout(() => finishHangman(true), 700);
+    }
+  } else {
+    wrongGuesses++;
+    renderWrongLetters();
+    document.getElementById("wrong-count").textContent = wrongGuesses + " / 3";
+
+    if (wrongGuesses >= 3) {
+      // Show the full answer with the same spacing style
+      document.getElementById("word-display").textContent = currentWord.split("").join(" ");
+      document.getElementById("word-display").style.color = "#ff6666";
+      document.getElementById("guess-input").disabled = true;
+
+      setTimeout(() => finishHangman(false), 2000);
+    }
+  }
+});
+
+document.getElementById("hangman-close").onclick = () => {
+  if (wrongGuesses < 3) {
+    document.getElementById("hangman-area").classList.remove("show");
+  }
+};
+
+function finishHangman(success) {
+  document.getElementById("hangman-area").classList.remove("show");
+  // clean up image class so next round starts clean
+  document.getElementById("hangman-area").classList.remove("has-image");
+
+  if (success) {
+    board[currentCell] = currentPlayer;
+    attempts[currentCell] = 0; // reset since solved
+    renderBoard();
+    checkWinner();
+    switchPlayer();
+  } else {
+    attempts[currentCell]++;
+    if (attempts[currentCell] >= 2) {
+      board[currentCell] = "blocked";
+    } else {
+      switchPlayer();
+    }
+    renderBoard();
+  }
+}
+
+function renderBoard() {
+  document.querySelectorAll(".cell").forEach((cell, i) => {
+    if (board[i] === "X") { cell.textContent = "X"; cell.className = "cell X"; }
+    else if (board[i] === "O") { cell.textContent = "O"; cell.className = "cell O"; }
+    else if (board[i] === "blocked" || attempts[i] >= 2) { 
+      cell.textContent = "!!!"; 
+      cell.className = "cell blocked"; 
+    }
+    else { 
+      cell.innerHTML = categories[i].replace(" ", "<br>"); 
+      cell.className = "cell"; 
+    }
+  });
+}
+
+function switchPlayer() {
+  if (!gameActive) return;
+  currentPlayer = currentPlayer === "X" ? "O" : "X";
+  updateTurnDisplay();
+}
+
+function checkWinner() {
+  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for (const [a,b,c] of lines) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      gameActive = false;
+      announceWinner(board[a]);
+      return;
+    }
+  }
+  if (board.every(c => c !== null)) {
+    gameActive = false;
+    announceWinner("draw");
+  }
+}
+
+function announceWinner(w) {
+  const txt = document.getElementById("winner-text");
+  if (w === "X") txt.innerHTML = "GIRLS<br>WIN!";
+  else if (w === "O") txt.innerHTML = "BOYS<br>WIN!";
+  else txt.textContent = "IT'S A DRAW!";
+  document.getElementById("winner-screen").style.display = "flex";
+}
+
+updateTurnDisplay();
+</script>
+</body>
+</html>
